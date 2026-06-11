@@ -3,8 +3,9 @@ package logica;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
+import java.io.Serializable;
 
-public class Prestamo {
+public class Prestamo implements Serializable {
 
     private int numero;
     private LocalDateTime fecha;
@@ -96,6 +97,10 @@ public class Prestamo {
     }
 
     public boolean eliminarItem(String codigoItem) {
+        if (codigoItem == null) {
+            return false;
+        }
+
         if (itemsDelPrestamo.containsKey(codigoItem)) {
             Item itemEncontrado = itemsDelPrestamo.get(codigoItem);
             itemEncontrado.marcarComoDisponible();
@@ -108,10 +113,18 @@ public class Prestamo {
     }
 
     public boolean contieneItem(String codigoItem) {
+        if (codigoItem == null) {
+            return false;
+        }
+
         return itemsDelPrestamo.containsKey(codigoItem);
     }
 
     public boolean retornarItem(String codigoItem) {
+        if (codigoItem == null) {
+            return false;
+        }
+
         if (itemsDelPrestamo.containsKey(codigoItem)) {
             Item itemDevuelto = itemsDelPrestamo.get(codigoItem);
             itemDevuelto.marcarComoDisponible();

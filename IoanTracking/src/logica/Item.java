@@ -2,8 +2,9 @@ package logica;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.io.Serializable;
 
-public class Item {
+public class Item implements Serializable {
 
     private String nombre;
     private String codigo;
@@ -88,7 +89,10 @@ public class Item {
     }
 
     public boolean perteneceACategoria(String nombreCategoria) {
-        return categoriasDelItem.containsKey(nombreCategoria);
+        if (nombreCategoria == null) {
+        	return false;
+        }
+    	return categoriasDelItem.containsKey(nombreCategoria);
     }
 
     public void marcarComoPrestado() {

@@ -1,8 +1,9 @@
 package logica;
 
 import java.time.LocalDateTime;
+import java.io.Serializable;
 
-public class Alerta {
+public class Alerta implements Serializable {
 
     private LocalDateTime horaActivacion;
     private String tipoAlerta;
@@ -71,7 +72,7 @@ public class Alerta {
             return false;
         }
 
-        if (fechaActual == null) {
+        if (fechaActual == null || horaActivacion == null) {
             return false;
         }
 

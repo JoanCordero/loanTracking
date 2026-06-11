@@ -1,6 +1,8 @@
 package logica;
 
-public class Tipo {
+import java.io.Serializable;
+
+public class Tipo implements Serializable {
 
     private String nombre;
     private boolean esGenerico;

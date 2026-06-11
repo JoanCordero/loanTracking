@@ -4,10 +4,13 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.time.LocalDateTime;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.PrintWriter;
-import java.util.Scanner;
+
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
 
 import logica.Alerta;
 import logica.Categoria;
@@ -17,8 +20,10 @@ import logica.Prestamo;
 import logica.Tipo;
 
 
-public class ControladoraPrestamos {
+public class ControladoraPrestamos implements Serializable {
 
+	private static ControladoraPrestamos instance = new ControladoraPrestamos();
+	
     private Map<String, Persona> personasRegistradas;
     private Map<String, Categoria> categoriasRegistradas;
     private Map<String, Tipo> tiposRegistrados;
@@ -27,6 +32,10 @@ public class ControladoraPrestamos {
 
     private int consecutivoPrestamo;
     private Tipo tipoGenerico;
+    
+    public static ControladoraPrestamos getInstance() {
+	    return instance;
+	}
 
     public ControladoraPrestamos() {
         personasRegistradas = new HashMap<String, Persona>();
@@ -751,227 +760,26 @@ public class ControladoraPrestamos {
         }
 
         return reporte;
-    }    public boolean guardarDatos(String rutaArchivo) {
-        if (rutaArchivo == null || rutaArchivo.equals("")) {
-            return false;
-        }
+    }   
+    
+    public static void guardarDatos() throws IOException {
+        FileOutputStream file = new FileOutputStream("DatosPrestamos.dat");
+        ObjectOutputStream stream = new ObjectOutputStream(file);
 
-        FileWriter archivo = null;
-        PrintWriter escritor = null;
+        stream.writeObject(instance);
 
-        try {
-            archivo = new FileWriter(rutaArchivo);
-            escritor = new PrintWriter(archivo);
-
-            escritor.println("CONSECUTIVO|" + consecutivoPrestamo);
-
-            for (Tipo tipoActual : tiposRegistrados.values()) {
-                escritor.println("TIPO|" + limpiarTexto(tipoActual.getNombre()) + "|" + tipoActual.isEsGenerico());
-            }
-
-            for (Categoria categoriaActual : categoriasRegistradas.values()) {
-                escritor.println("CATEGORIA|" + limpiarTexto(categoriaActual.getNombre()));
-            }
-
-            for (Persona personaActual : personasRegistradas.values()) {
-                escritor.println("PERSONA|" + limpiarTexto(personaActual.getNombre()) + "|"
-                        + limpiarTexto(personaActual.getTelefono()) + "|"
-                        + limpiarTexto(personaActual.getCorreo()));
-            }
-
-            for (Item itemActual : itemsRegistrados.values()) {
-                escritor.println("ITEM|" + limpiarTexto(itemActual.getNombre()) + "|"
-                        + limpiarTexto(itemActual.getCodigo()) + "|"
-                        + limpiarTexto(itemActual.getDescripcion()) + "|"
-                        + limpiarTexto(itemActual.getTipo().getNombre()) + "|"
-                        + itemActual.isPrestado());
-            }
-
-            for (Item itemActual : itemsRegistrados.values()) {
-                for (Categoria categoriaActual : itemActual.getCategorias().values()) {
-                    escritor.println("ITEMCATEGORIA|" + limpiarTexto(itemActual.getCodigo()) + "|"
-                            + limpiarTexto(categoriaActual.getNombre()));
-                }
-            }
-
-            for (Prestamo prestamoActual : prestamosRegistrados.values()) {
-                escritor.println("PRESTAMO|" + prestamoActual.getNumero() + "|"
-                        + limpiarTexto(prestamoActual.getPersona().getCorreo()) + "|"
-                        + convertirFechaAString(prestamoActual.getFecha()) + "|"
-                        + convertirFechaAString(prestamoActual.getFechaFinalizacion()) + "|"
-                        + prestamoActual.isFinalizado());
-            }
-
-            for (Prestamo prestamoActual : prestamosRegistrados.values()) {
-                for (Item itemActual : prestamoActual.getItems().values()) {
-                    escritor.println("PRESTAMOITEM|" + prestamoActual.getNumero() + "|"
-                            + limpiarTexto(itemActual.getCodigo()));
-                }
-            }
-
-            for (Prestamo prestamoActual : prestamosRegistrados.values()) {
-                if (prestamoActual.getAlerta() != null) {
-                    Alerta alertaActual = prestamoActual.getAlerta();
-
-                    escritor.println("ALERTA|" + prestamoActual.getNumero() + "|"
-                            + convertirFechaAString(alertaActual.getHoraActivacion()) + "|"
-                            + limpiarTexto(alertaActual.getTipoAlerta()) + "|"
-                            + limpiarTexto(alertaActual.getMensaje()) + "|"
-                            + alertaActual.isActiva() + "|"
-                            + alertaActual.isRecurrente());
-                }
-            }
-
-            escritor.close();
-            archivo.close();
-
-            return true;
-
-        } catch (Exception error) {
-            return false;
-        }
+        stream.close();
+        file.close();
     }
 
-    public boolean cargarDatos(String rutaArchivo) {
-        if (rutaArchivo == null || rutaArchivo.equals("")) {
-            return false;
-        }
+    public static void cargarDatos() throws IOException, ClassNotFoundException {
+        FileInputStream file = new FileInputStream("DatosPrestamos.dat");
+        ObjectInputStream stream = new ObjectInputStream(file);
 
-        File archivo = new File(rutaArchivo);
+        instance = (ControladoraPrestamos) stream.readObject();
 
-        if (archivo.exists() == false) {
-            return false;
-        }
-
-        try {
-            personasRegistradas.clear();
-            categoriasRegistradas.clear();
-            tiposRegistrados.clear();
-            itemsRegistrados.clear();
-            prestamosRegistrados.clear();
-
-            tipoGenerico = new Tipo("General", true);
-            tiposRegistrados.put(tipoGenerico.getNombre(), tipoGenerico);
-            consecutivoPrestamo = 1;
-
-            Scanner lector = new Scanner(archivo);
-
-            while (lector.hasNextLine()) {
-                String linea = lector.nextLine();
-                String[] datos = linea.split("\\|");
-
-                if (datos[0].equals("CONSECUTIVO")) {
-                    consecutivoPrestamo = Integer.parseInt(datos[1]);
-                }
-
-                if (datos[0].equals("TIPO")) {
-                    String nombreTipo = datos[1];
-                    boolean generico = Boolean.parseBoolean(datos[2]);
-
-                    if (tiposRegistrados.containsKey(nombreTipo) == false) {
-                        Tipo tipoNuevo = new Tipo(nombreTipo, generico);
-                        tiposRegistrados.put(nombreTipo, tipoNuevo);
-
-                        if (generico == true) {
-                            tipoGenerico = tipoNuevo;
-                        }
-                    }
-                }
-
-                if (datos[0].equals("CATEGORIA")) {
-                    String nombreCategoria = datos[1];
-
-                    if (categoriasRegistradas.containsKey(nombreCategoria) == false) {
-                        Categoria categoriaNueva = new Categoria(nombreCategoria);
-                        categoriasRegistradas.put(nombreCategoria, categoriaNueva);
-                    }
-                }
-
-                if (datos[0].equals("PERSONA")) {
-                    Persona personaNueva = new Persona(datos[1], datos[2], datos[3]);
-                    personasRegistradas.put(personaNueva.getCorreo(), personaNueva);
-                }
-
-                if (datos[0].equals("ITEM")) {
-                    String nombreItem = datos[1];
-                    String codigoItem = datos[2];
-                    String descripcionItem = datos[3];
-                    String nombreTipo = datos[4];
-
-                    Tipo tipoEncontrado = buscarTipo(nombreTipo);
-
-                    if (tipoEncontrado == null) {
-                        tipoEncontrado = tipoGenerico;
-                    }
-
-                    Item itemNuevo = new Item(nombreItem, codigoItem, descripcionItem, tipoEncontrado);
-                    itemNuevo.setPrestado(Boolean.parseBoolean(datos[5]));
-                    itemsRegistrados.put(codigoItem, itemNuevo);
-                }
-
-                if (datos[0].equals("ITEMCATEGORIA")) {
-                    Item itemEncontrado = buscarItem(datos[1]);
-                    Categoria categoriaEncontrada = buscarCategoria(datos[2]);
-
-                    if (itemEncontrado != null && categoriaEncontrada != null) {
-                        itemEncontrado.agregarCategoria(categoriaEncontrada);
-                    }
-                }
-
-                if (datos[0].equals("PRESTAMO")) {
-                    int numeroPrestamo = Integer.parseInt(datos[1]);
-                    Persona personaEncontrada = buscarPersona(datos[2]);
-
-                    if (personaEncontrada != null) {
-                        Prestamo prestamoNuevo = new Prestamo(numeroPrestamo, personaEncontrada);
-
-                        prestamoNuevo.setFecha(convertirStringAFecha(datos[3]));
-                        prestamoNuevo.setFechaFinalizacion(convertirStringAFecha(datos[4]));
-                        prestamoNuevo.setFinalizado(Boolean.parseBoolean(datos[5]));
-
-                        prestamosRegistrados.put(numeroPrestamo, prestamoNuevo);
-                        personaEncontrada.agregarPrestamo(prestamoNuevo);
-                    }
-                }
-
-                if (datos[0].equals("PRESTAMOITEM")) {
-                    int numeroPrestamo = Integer.parseInt(datos[1]);
-                    String codigoItem = datos[2];
-
-                    Prestamo prestamoEncontrado = buscarPrestamo(numeroPrestamo);
-                    Item itemEncontrado = buscarItem(codigoItem);
-
-                    if (prestamoEncontrado != null && itemEncontrado != null) {
-                        prestamoEncontrado.agregarItem(itemEncontrado);
-                    }
-                }
-
-                if (datos[0].equals("ALERTA")) {
-                    int numeroPrestamo = Integer.parseInt(datos[1]);
-                    Prestamo prestamoEncontrado = buscarPrestamo(numeroPrestamo);
-
-                    if (prestamoEncontrado != null) {
-                        LocalDateTime hora = convertirStringAFecha(datos[2]);
-                        String tipoAlerta = datos[3];
-                        String mensaje = datos[4];
-                        boolean activa = Boolean.parseBoolean(datos[5]);
-                        boolean recurrente = Boolean.parseBoolean(datos[6]);
-
-                        Alerta alertaNueva = new Alerta(hora, tipoAlerta, mensaje, recurrente);
-                        alertaNueva.setActiva(activa);
-
-                        prestamoEncontrado.setAlerta(alertaNueva);
-                    }
-                }
-            }
-
-            lector.close();
-
-            return true;
-
-        } catch (Exception error) {
-            return false;
-        }
+        stream.close();
+        file.close();
     }
     
     
@@ -1026,34 +834,6 @@ public class ControladoraPrestamos {
         }
 
         return itemsRegistrados.containsKey(codigo);
-    }
-    
-    private String limpiarTexto(String texto) {
-        if (texto == null) {
-            return "";
-        }
-
-        return texto.replace("|", " ");
-    }
-
-    private String convertirFechaAString(LocalDateTime fecha) {
-        if (fecha == null) {
-            return "null";
-        }
-
-        return fecha.toString();
-    }
-
-    private LocalDateTime convertirStringAFecha(String textoFecha) {
-        if (textoFecha == null) {
-            return null;
-        }
-
-        if (textoFecha.equals("null")) {
-            return null;
-        }
-
-        return LocalDateTime.parse(textoFecha);
     }
     
 }
