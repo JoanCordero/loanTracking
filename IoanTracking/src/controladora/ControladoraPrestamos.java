@@ -3,12 +3,19 @@ package controladora;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.time.LocalDateTime;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.PrintWriter;
+import java.util.Scanner;
 
+import logica.Alerta;
 import logica.Categoria;
 import logica.Item;
 import logica.Persona;
 import logica.Prestamo;
 import logica.Tipo;
+
 
 public class ControladoraPrestamos {
 
@@ -291,6 +298,683 @@ public class ControladoraPrestamos {
 
         return listaTipos;
     }
+    
+    public boolean crearItem(String nombre, String codigo, String descripcion, String nombreTipo) {
+        if (nombre == null || codigo == null || descripcion == null || nombreTipo == null) {
+            return false;
+        }
+
+        if (nombre.equals("") || codigo.equals("") || descripcion.equals("") || nombreTipo.equals("")) {
+            return false;
+        }
+
+        if (existeItem(codigo)) {
+            return false;
+        }
+
+        Tipo tipoDelItem = buscarTipo(nombreTipo);
+
+        if (tipoDelItem == null) {
+            return false;
+        }
+
+        Item itemNuevo = new Item(nombre, codigo, descripcion, tipoDelItem);
+        itemsRegistrados.put(codigo, itemNuevo);
+
+        return true;
+    }
+
+    public Item buscarItem(String codigo) {
+        if (codigo == null) {
+            return null;
+        }
+
+        if (itemsRegistrados.containsKey(codigo)) {
+            return itemsRegistrados.get(codigo);
+        }
+
+        return null;
+    }
+
+    public boolean modificarItem(String codigo, String nombre, String descripcion, String nombreTipo) {
+        if (codigo == null || nombre == null || descripcion == null || nombreTipo == null) {
+            return false;
+        }
+
+        if (codigo.equals("") || nombre.equals("") || descripcion.equals("") || nombreTipo.equals("")) {
+            return false;
+        }
+
+        Item itemEncontrado = buscarItem(codigo);
+
+        if (itemEncontrado == null) {
+            return false;
+        }
+
+        Tipo tipoEncontrado = buscarTipo(nombreTipo);
+
+        if (tipoEncontrado == null) {
+            return false;
+        }
+
+        itemEncontrado.setNombre(nombre);
+        itemEncontrado.setDescripcion(descripcion);
+        itemEncontrado.setTipo(tipoEncontrado);
+
+        return true;
+    }
+
+    public boolean borrarItem(String codigo) {
+        Item itemEncontrado = buscarItem(codigo);
+
+        if (itemEncontrado == null) {
+            return false;
+        }
+
+        if (itemEncontrado.isPrestado() == true) {
+            return false;
+        }
+
+        itemsRegistrados.remove(codigo);
+
+        return true;
+    }
+
+    public boolean agregarCategoriaAItem(String codigoItem, String nombreCategoria) {
+        Item itemEncontrado = buscarItem(codigoItem);
+        Categoria categoriaEncontrada = buscarCategoria(nombreCategoria);
+
+        if (itemEncontrado == null || categoriaEncontrada == null) {
+            return false;
+        }
+
+        return itemEncontrado.agregarCategoria(categoriaEncontrada);
+    }
+
+    public boolean eliminarCategoriaDeItem(String codigoItem, String nombreCategoria) {
+        Item itemEncontrado = buscarItem(codigoItem);
+
+        if (itemEncontrado == null) {
+            return false;
+        }
+
+        return itemEncontrado.eliminarCategoria(nombreCategoria);
+    }
+
+    public ArrayList<Item> listarItems() {
+        ArrayList<Item> listaItems = new ArrayList<Item>();
+
+        for (Item itemActual : itemsRegistrados.values()) {
+            listaItems.add(itemActual);
+        }
+
+        return listaItems;
+    }
+    
+    public Prestamo hacerPrestamo(String correoPersona) {
+        if (correoPersona == null) {
+            return null;
+        }
+
+        Persona personaEncontrada = buscarPersona(correoPersona);
+
+        if (personaEncontrada == null) {
+            return null;
+        }
+
+        if (personaTienePrestamoActivo(correoPersona)) {
+            return null;
+        }
+
+        Prestamo prestamoNuevo = new Prestamo(consecutivoPrestamo, personaEncontrada);
+
+        prestamosRegistrados.put(consecutivoPrestamo, prestamoNuevo);
+        personaEncontrada.agregarPrestamo(prestamoNuevo);
+
+        consecutivoPrestamo++;
+
+        return prestamoNuevo;
+    }
+
+    public boolean agregarItemAPrestamo(int numeroPrestamo, String codigoItem) {
+        Prestamo prestamoEncontrado = buscarPrestamo(numeroPrestamo);
+        Item itemEncontrado = buscarItem(codigoItem);
+
+        if (prestamoEncontrado == null || itemEncontrado == null) {
+            return false;
+        }
+
+        if (prestamoEncontrado.isFinalizado() == true) {
+            return false;
+        }
+
+        return prestamoEncontrado.agregarItem(itemEncontrado);
+    }
+
+    public boolean eliminarItemDePrestamo(int numeroPrestamo, String codigoItem) {
+        Prestamo prestamoEncontrado = buscarPrestamo(numeroPrestamo);
+
+        if (prestamoEncontrado == null) {
+            return false;
+        }
+
+        if (prestamoEncontrado.isFinalizado() == true) {
+            return false;
+        }
+
+        return prestamoEncontrado.eliminarItem(codigoItem);
+    }
+
+    public Prestamo buscarPrestamo(int numeroPrestamo) {
+        if (prestamosRegistrados.containsKey(numeroPrestamo)) {
+            return prestamosRegistrados.get(numeroPrestamo);
+        }
+
+        return null;
+    }
+
+    public boolean retornarItem(int numeroPrestamo, String codigoItem) {
+        Prestamo prestamoEncontrado = buscarPrestamo(numeroPrestamo);
+
+        if (prestamoEncontrado == null) {
+            return false;
+        }
+
+        if (prestamoEncontrado.isFinalizado() == true) {
+            return false;
+        }
+
+        return prestamoEncontrado.retornarItem(codigoItem);
+    }
+
+    public boolean finalizarPrestamo(int numeroPrestamo) {
+        Prestamo prestamoEncontrado = buscarPrestamo(numeroPrestamo);
+
+        if (prestamoEncontrado == null) {
+            return false;
+        }
+
+        if (prestamoEncontrado.isFinalizado() == true) {
+            return false;
+        }
+
+        if (prestamoEncontrado.getAlerta() != null) {
+            prestamoEncontrado.getAlerta().desactivar();
+        }
+
+        prestamoEncontrado.finalizarPrestamo();
+
+        return true;
+    }
+
+    public ArrayList<Prestamo> listarPrestamos() {
+        ArrayList<Prestamo> listaPrestamos = new ArrayList<Prestamo>();
+
+        for (Prestamo prestamoActual : prestamosRegistrados.values()) {
+            listaPrestamos.add(prestamoActual);
+        }
+
+        return listaPrestamos;
+    }
+    
+    public boolean agregarAlertaAPrestamo(int numeroPrestamo, LocalDateTime hora, String tipoAlerta, String mensaje, boolean recurrente) {
+        if (hora == null || tipoAlerta == null || mensaje == null) {
+            return false;
+        }
+
+        if (tipoAlerta.equals("") || mensaje.equals("")) {
+            return false;
+        }
+
+        Prestamo prestamoEncontrado = buscarPrestamo(numeroPrestamo);
+
+        if (prestamoEncontrado == null) {
+            return false;
+        }
+
+        if (prestamoEncontrado.isFinalizado() == true) {
+            return false;
+        }
+
+        Alerta alertaNueva = new Alerta(hora, tipoAlerta, mensaje, recurrente);
+        prestamoEncontrado.setAlerta(alertaNueva);
+
+        return true;
+    }
+
+    public boolean eliminarAlertaDePrestamo(int numeroPrestamo) {
+        Prestamo prestamoEncontrado = buscarPrestamo(numeroPrestamo);
+
+        if (prestamoEncontrado == null) {
+            return false;
+        }
+
+        if (prestamoEncontrado.getAlerta() == null) {
+            return false;
+        }
+
+        prestamoEncontrado.setAlerta(null);
+
+        return true;
+    }
+
+    public ArrayList<Alerta> consultarAlertasActivas() {
+        ArrayList<Alerta> listaAlertas = new ArrayList<Alerta>();
+        LocalDateTime fechaActual = LocalDateTime.now();
+
+        for (Prestamo prestamoActual : prestamosRegistrados.values()) {
+            if (prestamoActual.isFinalizado() == false) {
+                Alerta alertaActual = prestamoActual.getAlerta();
+
+                if (alertaActual != null) {
+                    if (alertaActual.debeMostrarse(fechaActual)) {
+                        listaAlertas.add(alertaActual);
+                        alertaActual.marcarComoMostrada();
+                    }
+                }
+            }
+        }
+
+        return listaAlertas;
+    }
+    
+    public String reportePorUsuario(String correo) {
+        Persona personaEncontrada = buscarPersona(correo);
+
+        if (personaEncontrada == null) {
+            return "No se encontro una persona registrada con ese correo.";
+        }
+
+        String reporte = "";
+
+        reporte += "REPORTE POR USUARIO\n";
+        reporte += "Nombre: " + personaEncontrada.getNombre() + "\n";
+        reporte += "Telefono: " + personaEncontrada.getTelefono() + "\n";
+        reporte += "Correo: " + personaEncontrada.getCorreo() + "\n\n";
+
+        if (personaEncontrada.getPrestamos().isEmpty()) {
+            reporte += "La persona no tiene prestamos registrados.\n";
+            return reporte;
+        }
+
+        reporte += "Prestamos registrados:\n";
+
+        for (Prestamo prestamoActual : personaEncontrada.getPrestamos().values()) {
+            reporte += "\nPrestamo numero: " + prestamoActual.getNumero() + "\n";
+            reporte += "Fecha: " + prestamoActual.getFecha() + "\n";
+
+            if (prestamoActual.isFinalizado() == true) {
+                reporte += "Estado: Finalizado\n";
+                reporte += "Fecha de finalizacion: " + prestamoActual.getFechaFinalizacion() + "\n";
+            } else {
+                reporte += "Estado: Activo\n";
+            }
+
+            reporte += "Cantidad de items: " + prestamoActual.cantidadItems() + "\n";
+
+            if (prestamoActual.getItems().isEmpty()) {
+                reporte += "No tiene items actualmente.\n";
+            } else {
+                reporte += "Items:\n";
+
+                for (Item itemActual : prestamoActual.getItems().values()) {
+                    reporte += "- " + itemActual.getCodigo() + " | " + itemActual.getNombre() + "\n";
+                }
+            }
+        }
+
+        return reporte;
+    }
+
+    public String reportePorItem(String codigoItem) {
+        Item itemEncontrado = buscarItem(codigoItem);
+
+        if (itemEncontrado == null) {
+            return "No se encontro un item registrado con ese codigo.";
+        }
+
+        String reporte = "";
+
+        reporte += "REPORTE POR ITEM\n";
+        reporte += "Codigo: " + itemEncontrado.getCodigo() + "\n";
+        reporte += "Nombre: " + itemEncontrado.getNombre() + "\n";
+        reporte += "Descripcion: " + itemEncontrado.getDescripcion() + "\n";
+        reporte += "Tipo: " + itemEncontrado.getTipo().getNombre() + "\n";
+
+        if (itemEncontrado.isPrestado() == true) {
+            reporte += "Estado: Prestado\n";
+        } else {
+            reporte += "Estado: Disponible\n";
+        }
+
+        if (itemEncontrado.getCategorias().isEmpty()) {
+            reporte += "Categorias: Sin categorias asignadas\n";
+        } else {
+            reporte += "Categorias:\n";
+
+            for (Categoria categoriaActual : itemEncontrado.getCategorias().values()) {
+                reporte += "- " + categoriaActual.getNombre() + "\n";
+            }
+        }
+
+        reporte += "\nPrestamos donde aparece actualmente:\n";
+
+        boolean itemApareceEnPrestamo = false;
+
+        for (Prestamo prestamoActual : prestamosRegistrados.values()) {
+            if (prestamoActual.contieneItem(codigoItem)) {
+                reporte += "- Prestamo numero " + prestamoActual.getNumero();
+                reporte += " | Persona: " + prestamoActual.getPersona().getNombre() + "\n";
+                itemApareceEnPrestamo = true;
+            }
+        }
+
+        if (itemApareceEnPrestamo == false) {
+            reporte += "El item no aparece en prestamos activos actualmente.\n";
+        }
+
+        return reporte;
+    }
+
+    public String reportePorCategoria(String nombreCategoria) {
+        Categoria categoriaEncontrada = buscarCategoria(nombreCategoria);
+
+        if (categoriaEncontrada == null) {
+            return "No se encontro una categoria registrada con ese nombre.";
+        }
+
+        String reporte = "";
+
+        reporte += "REPORTE POR CATEGORIA\n";
+        reporte += "Categoria: " + categoriaEncontrada.getNombre() + "\n\n";
+        reporte += "Items relacionados:\n";
+
+        boolean encontroItems = false;
+
+        for (Item itemActual : itemsRegistrados.values()) {
+            if (itemActual.perteneceACategoria(nombreCategoria)) {
+                reporte += "- " + itemActual.getCodigo() + " | " + itemActual.getNombre();
+
+                if (itemActual.isPrestado() == true) {
+                    reporte += " | Prestado\n";
+                } else {
+                    reporte += " | Disponible\n";
+                }
+
+                encontroItems = true;
+            }
+        }
+
+        if (encontroItems == false) {
+            reporte += "No hay items registrados en esta categoria.\n";
+        }
+
+        return reporte;
+    }
+
+    public String reportePorTipo(String nombreTipo) {
+        Tipo tipoEncontrado = buscarTipo(nombreTipo);
+
+        if (tipoEncontrado == null) {
+            return "No se encontro un tipo registrado con ese nombre.";
+        }
+
+        String reporte = "";
+
+        reporte += "REPORTE POR TIPO\n";
+        reporte += "Tipo: " + tipoEncontrado.getNombre() + "\n";
+
+        if (tipoEncontrado.isEsGenerico() == true) {
+            reporte += "Este tipo esta marcado como tipo generico.\n";
+        }
+
+        reporte += "\nItems relacionados:\n";
+
+        boolean encontroItems = false;
+
+        for (Item itemActual : itemsRegistrados.values()) {
+            if (itemActual.getTipo().getNombre().equals(nombreTipo)) {
+                reporte += "- " + itemActual.getCodigo() + " | " + itemActual.getNombre();
+
+                if (itemActual.isPrestado() == true) {
+                    reporte += " | Prestado\n";
+                } else {
+                    reporte += " | Disponible\n";
+                }
+
+                encontroItems = true;
+            }
+        }
+
+        if (encontroItems == false) {
+            reporte += "No hay items registrados con este tipo.\n";
+        }
+
+        return reporte;
+    }    public boolean guardarDatos(String rutaArchivo) {
+        if (rutaArchivo == null || rutaArchivo.equals("")) {
+            return false;
+        }
+
+        FileWriter archivo = null;
+        PrintWriter escritor = null;
+
+        try {
+            archivo = new FileWriter(rutaArchivo);
+            escritor = new PrintWriter(archivo);
+
+            escritor.println("CONSECUTIVO|" + consecutivoPrestamo);
+
+            for (Tipo tipoActual : tiposRegistrados.values()) {
+                escritor.println("TIPO|" + limpiarTexto(tipoActual.getNombre()) + "|" + tipoActual.isEsGenerico());
+            }
+
+            for (Categoria categoriaActual : categoriasRegistradas.values()) {
+                escritor.println("CATEGORIA|" + limpiarTexto(categoriaActual.getNombre()));
+            }
+
+            for (Persona personaActual : personasRegistradas.values()) {
+                escritor.println("PERSONA|" + limpiarTexto(personaActual.getNombre()) + "|"
+                        + limpiarTexto(personaActual.getTelefono()) + "|"
+                        + limpiarTexto(personaActual.getCorreo()));
+            }
+
+            for (Item itemActual : itemsRegistrados.values()) {
+                escritor.println("ITEM|" + limpiarTexto(itemActual.getNombre()) + "|"
+                        + limpiarTexto(itemActual.getCodigo()) + "|"
+                        + limpiarTexto(itemActual.getDescripcion()) + "|"
+                        + limpiarTexto(itemActual.getTipo().getNombre()) + "|"
+                        + itemActual.isPrestado());
+            }
+
+            for (Item itemActual : itemsRegistrados.values()) {
+                for (Categoria categoriaActual : itemActual.getCategorias().values()) {
+                    escritor.println("ITEMCATEGORIA|" + limpiarTexto(itemActual.getCodigo()) + "|"
+                            + limpiarTexto(categoriaActual.getNombre()));
+                }
+            }
+
+            for (Prestamo prestamoActual : prestamosRegistrados.values()) {
+                escritor.println("PRESTAMO|" + prestamoActual.getNumero() + "|"
+                        + limpiarTexto(prestamoActual.getPersona().getCorreo()) + "|"
+                        + convertirFechaAString(prestamoActual.getFecha()) + "|"
+                        + convertirFechaAString(prestamoActual.getFechaFinalizacion()) + "|"
+                        + prestamoActual.isFinalizado());
+            }
+
+            for (Prestamo prestamoActual : prestamosRegistrados.values()) {
+                for (Item itemActual : prestamoActual.getItems().values()) {
+                    escritor.println("PRESTAMOITEM|" + prestamoActual.getNumero() + "|"
+                            + limpiarTexto(itemActual.getCodigo()));
+                }
+            }
+
+            for (Prestamo prestamoActual : prestamosRegistrados.values()) {
+                if (prestamoActual.getAlerta() != null) {
+                    Alerta alertaActual = prestamoActual.getAlerta();
+
+                    escritor.println("ALERTA|" + prestamoActual.getNumero() + "|"
+                            + convertirFechaAString(alertaActual.getHoraActivacion()) + "|"
+                            + limpiarTexto(alertaActual.getTipoAlerta()) + "|"
+                            + limpiarTexto(alertaActual.getMensaje()) + "|"
+                            + alertaActual.isActiva() + "|"
+                            + alertaActual.isRecurrente());
+                }
+            }
+
+            escritor.close();
+            archivo.close();
+
+            return true;
+
+        } catch (Exception error) {
+            return false;
+        }
+    }
+
+    public boolean cargarDatos(String rutaArchivo) {
+        if (rutaArchivo == null || rutaArchivo.equals("")) {
+            return false;
+        }
+
+        File archivo = new File(rutaArchivo);
+
+        if (archivo.exists() == false) {
+            return false;
+        }
+
+        try {
+            personasRegistradas.clear();
+            categoriasRegistradas.clear();
+            tiposRegistrados.clear();
+            itemsRegistrados.clear();
+            prestamosRegistrados.clear();
+
+            tipoGenerico = new Tipo("General", true);
+            tiposRegistrados.put(tipoGenerico.getNombre(), tipoGenerico);
+            consecutivoPrestamo = 1;
+
+            Scanner lector = new Scanner(archivo);
+
+            while (lector.hasNextLine()) {
+                String linea = lector.nextLine();
+                String[] datos = linea.split("\\|");
+
+                if (datos[0].equals("CONSECUTIVO")) {
+                    consecutivoPrestamo = Integer.parseInt(datos[1]);
+                }
+
+                if (datos[0].equals("TIPO")) {
+                    String nombreTipo = datos[1];
+                    boolean generico = Boolean.parseBoolean(datos[2]);
+
+                    if (tiposRegistrados.containsKey(nombreTipo) == false) {
+                        Tipo tipoNuevo = new Tipo(nombreTipo, generico);
+                        tiposRegistrados.put(nombreTipo, tipoNuevo);
+
+                        if (generico == true) {
+                            tipoGenerico = tipoNuevo;
+                        }
+                    }
+                }
+
+                if (datos[0].equals("CATEGORIA")) {
+                    String nombreCategoria = datos[1];
+
+                    if (categoriasRegistradas.containsKey(nombreCategoria) == false) {
+                        Categoria categoriaNueva = new Categoria(nombreCategoria);
+                        categoriasRegistradas.put(nombreCategoria, categoriaNueva);
+                    }
+                }
+
+                if (datos[0].equals("PERSONA")) {
+                    Persona personaNueva = new Persona(datos[1], datos[2], datos[3]);
+                    personasRegistradas.put(personaNueva.getCorreo(), personaNueva);
+                }
+
+                if (datos[0].equals("ITEM")) {
+                    String nombreItem = datos[1];
+                    String codigoItem = datos[2];
+                    String descripcionItem = datos[3];
+                    String nombreTipo = datos[4];
+
+                    Tipo tipoEncontrado = buscarTipo(nombreTipo);
+
+                    if (tipoEncontrado == null) {
+                        tipoEncontrado = tipoGenerico;
+                    }
+
+                    Item itemNuevo = new Item(nombreItem, codigoItem, descripcionItem, tipoEncontrado);
+                    itemNuevo.setPrestado(Boolean.parseBoolean(datos[5]));
+                    itemsRegistrados.put(codigoItem, itemNuevo);
+                }
+
+                if (datos[0].equals("ITEMCATEGORIA")) {
+                    Item itemEncontrado = buscarItem(datos[1]);
+                    Categoria categoriaEncontrada = buscarCategoria(datos[2]);
+
+                    if (itemEncontrado != null && categoriaEncontrada != null) {
+                        itemEncontrado.agregarCategoria(categoriaEncontrada);
+                    }
+                }
+
+                if (datos[0].equals("PRESTAMO")) {
+                    int numeroPrestamo = Integer.parseInt(datos[1]);
+                    Persona personaEncontrada = buscarPersona(datos[2]);
+
+                    if (personaEncontrada != null) {
+                        Prestamo prestamoNuevo = new Prestamo(numeroPrestamo, personaEncontrada);
+
+                        prestamoNuevo.setFecha(convertirStringAFecha(datos[3]));
+                        prestamoNuevo.setFechaFinalizacion(convertirStringAFecha(datos[4]));
+                        prestamoNuevo.setFinalizado(Boolean.parseBoolean(datos[5]));
+
+                        prestamosRegistrados.put(numeroPrestamo, prestamoNuevo);
+                        personaEncontrada.agregarPrestamo(prestamoNuevo);
+                    }
+                }
+
+                if (datos[0].equals("PRESTAMOITEM")) {
+                    int numeroPrestamo = Integer.parseInt(datos[1]);
+                    String codigoItem = datos[2];
+
+                    Prestamo prestamoEncontrado = buscarPrestamo(numeroPrestamo);
+                    Item itemEncontrado = buscarItem(codigoItem);
+
+                    if (prestamoEncontrado != null && itemEncontrado != null) {
+                        prestamoEncontrado.agregarItem(itemEncontrado);
+                    }
+                }
+
+                if (datos[0].equals("ALERTA")) {
+                    int numeroPrestamo = Integer.parseInt(datos[1]);
+                    Prestamo prestamoEncontrado = buscarPrestamo(numeroPrestamo);
+
+                    if (prestamoEncontrado != null) {
+                        LocalDateTime hora = convertirStringAFecha(datos[2]);
+                        String tipoAlerta = datos[3];
+                        String mensaje = datos[4];
+                        boolean activa = Boolean.parseBoolean(datos[5]);
+                        boolean recurrente = Boolean.parseBoolean(datos[6]);
+
+                        Alerta alertaNueva = new Alerta(hora, tipoAlerta, mensaje, recurrente);
+                        alertaNueva.setActiva(activa);
+
+                        prestamoEncontrado.setAlerta(alertaNueva);
+                    }
+                }
+            }
+
+            lector.close();
+
+            return true;
+
+        } catch (Exception error) {
+            return false;
+        }
+    }
+    
+    
 
     private boolean existePersona(String correo) {
         if (correo == null) {
@@ -336,5 +1020,40 @@ public class ControladoraPrestamos {
         }
     }
     
+    private boolean existeItem(String codigo) {
+        if (codigo == null) {
+            return false;
+        }
+
+        return itemsRegistrados.containsKey(codigo);
+    }
+    
+    private String limpiarTexto(String texto) {
+        if (texto == null) {
+            return "";
+        }
+
+        return texto.replace("|", " ");
+    }
+
+    private String convertirFechaAString(LocalDateTime fecha) {
+        if (fecha == null) {
+            return "null";
+        }
+
+        return fecha.toString();
+    }
+
+    private LocalDateTime convertirStringAFecha(String textoFecha) {
+        if (textoFecha == null) {
+            return null;
+        }
+
+        if (textoFecha.equals("null")) {
+            return null;
+        }
+
+        return LocalDateTime.parse(textoFecha);
+    }
     
 }
